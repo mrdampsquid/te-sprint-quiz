@@ -1,0 +1,3 @@
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/MSP_SaaS_Readiness_Scorecard.html" }]
+}
