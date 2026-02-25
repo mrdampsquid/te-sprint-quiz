@@ -247,6 +247,16 @@
         <input type="text" id="f-company" placeholder="Acme Corporation">
       </div>
       <div class="form-group">
+        <label for="f-region">Your Region *</label>
+        <select id="f-region">
+          <option value="">— Please select —</option>
+          <option value="North America">North America</option>
+          <option value="LATAM">LATAM</option>
+          <option value="EMEA">EMEA</option>
+          <option value="APJC">APJC</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label for="f-role">Your Technical Role *</label>
         <select id="f-role">
           <option value="">— Please select —</option>
@@ -296,6 +306,7 @@
   const PASS_MARK   = 24;
   const WEBHOOK_URL = 'https://cb3b981f4b1d4fbbac05f7ab28fea0.69.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/e53328120cda41c8b063c7e6ba7a6b3b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=4cqsDZFc3hE1Z-lI3kFD_jUxIwAQ-79XtJGu6Rj4IJk';   // ← replace with your endpoint
 
+  // ─── Answer key (Base64-encoded, decoded at scoring time only) ────────────
   const _ak = 'W1syXSxbMl0sWzFdLFsxXSxbMF0sWzFdLFszXSxbMV0sWzFdLFsxXSxbM10sWzFdLFsyXSxbMV0sWzJdLFsyXSxbMF0sWzRdLFszXSxbMF0sWzAsM10sWzNdLFswLDIsM10sWzBdLFswXSxbM10sWzJdLFsxXSxbMF0sWzJdXQ==';
   function _decodeKey() { return JSON.parse(atob(_ak)); }
 
@@ -613,9 +624,10 @@
     const name    = document.getElementById('f-name').value.trim();
     const email   = document.getElementById('f-email').value.trim();
     const company = document.getElementById('f-company').value.trim();
+    const region  = document.getElementById('f-region').value;
     const role    = document.getElementById('f-role').value;
     const errEl   = document.getElementById('err-contact');
-    if (!name || !email || !company || !role) {
+    if (!name || !email || !company || !region || !role) {
       errEl.textContent = 'Please complete all contact fields.';
       show('err-contact'); return;
     }
@@ -724,6 +736,7 @@
     const name    = document.getElementById('f-name').value.trim();
     const email   = document.getElementById('f-email').value.trim();
     const company = document.getElementById('f-company').value.trim();
+    const region  = document.getElementById('f-region').value;
     const role    = document.getElementById('f-role').value;
     const date    = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
 
@@ -751,39 +764,47 @@
       </div>
     `;
 
-    sendWebhook({ name, email, company, role, score, total: QUESTIONS.length, passed });
+    sendWebhook({ name, email, company, region, role, score, total: QUESTIONS.length, passed });
   }
 
   // ─── Webhook ──────────────────────────────────────────────────────────────
   async function sendWebhook(data) {
-    const el = document.getElementById('webhook-status');
-    el.className = 'webhook-status sending';
-    el.textContent = '⏳ Submitting your results…';
-    show('webhook-status');
-
     const payload = {
       timestamp:  new Date().toISOString(),
       assessment: 'ThousandEyes Sprint',
       name:       data.name,
       email:      data.email,
       company:    data.company,
+      region:     data.region,
       role:       data.role,
       score:      `${data.score} / ${data.total}`,
       result:     data.passed ? 'PASS' : 'FAIL'
     };
 
-    try {
-      const res = await fetch(WEBHOOK_URL, {
+    if (data.passed) {
+      const el = document.getElementById('webhook-status');
+      el.className = 'webhook-status sending';
+      el.textContent = '⏳ Submitting your results…';
+      show('webhook-status');
+      try {
+        const res = await fetch(WEBHOOK_URL, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        el.className = 'webhook-status ok';
+        el.textContent = '✓ Results submitted successfully to the ThousandEyes Channel Team.';
+      } catch (err) {
+        el.className = 'webhook-status fail';
+        el.textContent = '⚠ Could not submit results automatically. Please contact thousandeyes_channel@external.cisco.com with your score.';
+      }
+    } else {
+      fetch(WEBHOOK_URL, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body:    JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      el.className = 'webhook-status ok';
-      el.textContent = '✓ Results submitted successfully to the ThousandEyes Channel Team.';
-    } catch (err) {
-      el.className = 'webhook-status fail';
-      el.textContent = '⚠ Could not submit results automatically. Please contact thousandeyes_channel@external.cisco.com with your score.';
+      }).catch(() => {});
     }
   }
 </script>
